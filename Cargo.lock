@@ -16,11 +16,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "567b077b825e468cc974f0020d4082ee6e03132512f207ef1a02fd5d00d1f32d"
 
 [[package]]
+name = "async-attributes"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "efd3d156917d94862e779f356c5acae312b08fd3121e792c857d7928c8088423"
+dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "async-std"
 version = "1.6.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b93c583a035d21e6d6f09adf48abfc55277bf48886406df370e5db6babe3ab98"
 dependencies = [
+ "async-attributes",
  "async-task",
  "crossbeam-utils",
  "futures-channel",
@@ -215,6 +226,7 @@ dependencies = [
 name = "doorkeeper"
 version = "0.1.0"
 dependencies = [
+ "async-std",
  "btleplug",
 ]
 
@@ -335,9 +347,9 @@ dependencies = [
 
 [[package]]
 name = "generator"
-version = "0.6.20"
+version = "0.6.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "caaa160efb38ce00acbe4450d41a103fb3d2acdb17ff09a7cf38f3ac26af0738"
+checksum = "add72f17bb81521258fcc8a7a3245b1e184e916bfbe34f0ea89558f440df5c68"
 dependencies = [
  "cc",
  "libc",
