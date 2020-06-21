@@ -1,7 +1,6 @@
 use async_std::{
     io,
-    prelude::{FutureExt, StreamExt},
-    sync::{channel, Receiver},
+    sync::{channel},
     task,
 };
 use btleplug::api::{Central, CentralEvent, Peripheral};
@@ -13,6 +12,7 @@ use btleplug::corebluetooth::{adapter::Adapter, manager::Manager};
 use btleplug::winrtble::{adapter::Adapter, manager::Manager};
 use std::thread;
 use std::time::Duration;
+use std::str::FromStr;
 
 // adapter retrieval works differently depending on your platform right now.
 // API needs to be aligned.
@@ -46,11 +46,16 @@ enum Notification {
     DeviceDiscovered(btleplug::api::BDAddr),
     DeviceConnected(btleplug::api::BDAddr),
     DeviceDisconnected(btleplug::api::BDAddr),
-    InputLine(String),
+    DeviceNotification(String),
+    InputCommand(String),
 }
 
 #[async_std::main]
 async fn main() {
+
+    let peripheral_address = btleplug::api::BDAddr::from_str("00:13:AA:00:BA:0E").unwrap();
+    let characteristic_uuid: u16 = 0xFFE1;
+
     let manager = Manager::new().unwrap();
 
     // get the first bluetooth adapter
@@ -65,27 +70,28 @@ async fn main() {
     let (event_sender, event_receiver) = channel(256);
     
     let event_sender_clone = event_sender.clone();
+    let event_sender_clone2 = event_sender.clone();
 
     // Add ourselves to the central event handler output now, so we don't
     // have to carry around the Central object. We'll be using this in
     // connect anyways.
     let on_event = move |event: CentralEvent| match event {
         CentralEvent::DeviceDiscovered(bd_addr) => {
-            println!("DeviceDiscovered: {:?}", bd_addr);
+            //println!("DeviceDiscovered: {:?}", bd_addr);
             let s = event_sender.clone();
             task::spawn(async move {
                 s.send(Notification::DeviceDiscovered(bd_addr)).await;
             });
         }
         CentralEvent::DeviceConnected(bd_addr) => {
-            println!("DeviceConnected: {:?}", bd_addr);
+            //println!("DeviceConnected: {:?}", bd_addr);
             let s = event_sender.clone();
             task::spawn(async move {
                 s.send(Notification::DeviceConnected(bd_addr)).await;
             });
         }
         CentralEvent::DeviceDisconnected(bd_addr) => {
-            println!("DeviceDisconnected: {:?}", bd_addr);
+            //println!("DeviceDisconnected: {:?}", bd_addr);
             let s = event_sender.clone();
             task::spawn(async move {
                 s.send(Notification::DeviceDisconnected(bd_addr)).await;
@@ -101,7 +107,7 @@ async fn main() {
             let mut line = String::new();
             task::spawn(async move {
                 if let Ok(_) = stdin.read_line(&mut line).await {
-                    s.send(Notification::InputLine(String::from(line.trim()))).await;
+                    s.send(Notification::InputCommand(line)).await;
                 }
             });
             thread::sleep(Duration::from_millis(200));
@@ -109,25 +115,64 @@ async fn main() {
     });
 
     central.on_event(Box::new(on_event));
-    
+  
     loop {
         let result = event_receiver.recv().await;
-        println!("Received: {:?}", result);
+        //println!("Received: {:?}", result);
         if let Ok(notification) = result {
         match notification {
                 Notification::DeviceDiscovered(device_address) => {
-                    if device_address.to_string() == "00:13:AA:00:BA:0E" {
+                    if device_address == peripheral_address {
                         if let Some(device) = central.peripheral(device_address) {
                             device.connect().expect("Can't connect to peripheral...");
                         }
                     }
                 }
                 Notification::DeviceConnected(device_address) => {
-
+                    if let Some(peripheral) = central.peripheral(device_address) {
+                        if peripheral.is_connected() {
+                            let characteristics = peripheral.discover_characteristics().expect(&format!("Error while discovering characteristics of device '{}'", device_address));
+                            if let Some(ch) = characteristics.iter().find(|c| c.uuid == btleplug::api::UUID::B16(characteristic_uuid)) {
+                                // TODO: subscribe
+                                peripheral.subscribe(ch).expect("Subscription to characteristic failed");
+                                
+                                let event_sender_clone3 = event_sender_clone2.clone();
+                                
+                                peripheral.on_notification(Box::new(move |vn| {
+                                    let s = event_sender_clone3.clone();
+                                    let text = String::from_utf8(vn.value).expect("Notification message contains invalid UTF8 characters.");
+                                    task::spawn(async move {
+                                        s.send(Notification::DeviceNotification(text)).await;
+                                    });
+                                }));
+                            }
+                            else {
+                                eprintln!("Characteristic not found!");
+                            }
+                        }
+                    }
                 }
-                Notification::DeviceDisconnected(device_address) => {}
-                Notification::InputLine(line) => {
+                Notification::DeviceDisconnected(_device_address) => {
+                    // TODO: try to reconnect
+                }
+                Notification::DeviceNotification(notification_text) => {
+                    println!("{}", notification_text.trim());
+                }
+                Notification::InputCommand(command) => {
+                    if let Some(peripheral) = central.peripheral(peripheral_address) {
+                        if peripheral.is_connected() {
+                            if let Some(ch) = peripheral.characteristics().iter().find(|c| c.uuid == btleplug::api::UUID::B16(characteristic_uuid)) {
+                                //peripheral.command(ch, &[b'b', b'a', b'h', b'o', b'j', b'\n']).expect("Command failed!");
+                                peripheral.command(ch, command.as_bytes()).expect("Command failed!");
+                            }
+                        }
+                    }
 
+                    // TODO: send command/request to peripheral
+                    //let result = peripheral.request(last_char, &[b'1', b'\n']).expect("Request failed!");
+                    //let result = peripheral.request(last_char, &[b'b', b'a', b'h', b'o', b'j', b'\n']).expect("Request failed!");
+                    //println!("Result: {:?}", result);
+                    //peripheral.command(last_char, &[b'b', b'a', b'h', b'o', b'j', b'\n']).expect("Command failed!");
                 }
             }
         }
