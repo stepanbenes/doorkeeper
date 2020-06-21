@@ -1,31 +1,84 @@
-use async_std::io;
-use async_std::task;
-use async_std::prelude::*;
+use async_std::{
+    prelude::{FutureExt, StreamExt},
+    sync::{channel, Receiver},
+    task,
+};
+use btleplug::api::{Central, CentralEvent, Peripheral};
+#[cfg(target_os = "linux")]
+use btleplug::bluez::{adapter::ConnectedAdapter, manager::Manager};
+#[cfg(target_os = "macos")]
+use btleplug::corebluetooth::{adapter::Adapter, manager::Manager};
+#[cfg(target_os = "windows")]
+use btleplug::winrtble::{adapter::Adapter, manager::Manager};
+use std::thread;
+use std::time::Duration;
+
+// adapter retrieval works differently depending on your platform right now.
+// API needs to be aligned.
+
+#[cfg(any(target_os = "windows", target_os = "macos"))]
+fn get_central(manager: &Manager) -> Adapter {
+    let adapters = manager.adapters().unwrap();
+    adapters.into_iter().nth(0).unwrap()
+}
+
+#[cfg(target_os = "linux")]
+fn get_central(manager: &Manager) -> ConnectedAdapter {
+    let adapters = manager.adapters().unwrap();
+    let adapter = adapters.into_iter().nth(0).unwrap();
+    adapter.connect().unwrap()
+}
 
 #[async_std::main]
 async fn main() {
-    println!("Hello, world!");
+    let manager = Manager::new().unwrap();
 
-    let _peripheral_name = "BT05";
-    let _characteristic_uuid = "FF:E1";
+    // get the first bluetooth adapter
+    // connect to the adapter
+    let central = get_central(&manager);
 
-    let read_line_future = async {
-        let stdin = io::stdin();
-        let mut line = String::new();
-        match stdin.read_line(&mut line).await {
-            Ok(_) => Ok(line),
-            Err(e) => Err(e)
+    // start scanning for devices
+    central.start_scan().unwrap();
+    // instead of waiting, you can use central.on_event to be notified of
+    // new devices
+
+    let (event_sender, event_receiver) = channel(256);
+    // Add ourselves to the central event handler output now, so we don't
+    // have to carry around the Central object. We'll be using this in
+    // connect anyways.
+    let on_event = move |event: CentralEvent| match event {
+        CentralEvent::DeviceDiscovered(bd_addr) => {
+            println!("DeviceDiscovered: {:?}", bd_addr);
+            let s = event_sender.clone();
+            let e = event.clone();
+            task::spawn(async move {
+                s.send(e).await;
+            });
         }
+        CentralEvent::DeviceConnected(bd_addr) => {
+            println!("DeviceConnected: {:?}", bd_addr);
+            let s = event_sender.clone();
+            let e = event.clone();
+            task::spawn(async move {
+                s.send(e).await;
+            });
+        }
+        CentralEvent::DeviceDisconnected(bd_addr) => {
+            println!("DeviceDisconnected: {:?}", bd_addr);
+            let s = event_sender.clone();
+            let e = event.clone();
+            task::spawn(async move {
+                s.send(e).await;
+            });
+        }
+        _ => {}
     };
+
+    central.on_event(Box::new(on_event));
+
     
-    let delay_future = task::sleep(std::time::Duration::from_secs(5));
-
-    println!("{:?}", read_line_future.join(delay_future).await);
-
-    // TODO: https://github.com/deviceplug/btleplug
-
-    // TODO: https://github.com/deviceplug/btleplug/blob/master/src/api/mod.rs
-
-    // TODO: https://book.async.rs/
-    // TODO: https://docs.rs/async-std/1.6.1/async_std/
+    loop {
+        let result = event_receiver.recv().await;
+        println!("Received: {:?}", result);
+    }
 }
