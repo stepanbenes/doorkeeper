@@ -133,10 +133,10 @@ async fn main() {
                         if peripheral.is_connected() {
                             let characteristics = peripheral.discover_characteristics().expect(&format!("Error while discovering characteristics of device '{}'", device_address));
                             if let Some(ch) = characteristics.iter().find(|c| c.uuid == btleplug::api::UUID::B16(characteristic_uuid)) {
-                                // TODO: subscribe
+
                                 peripheral.subscribe(ch).expect("Subscription to characteristic failed");
                                 
-                                let event_sender_clone3 = event_sender_clone2.clone();
+                                let event_sender_clone3 = event_sender_clone2.clone(); // TODO: learn Rust and avoid this ugly clones
                                 
                                 peripheral.on_notification(Box::new(move |vn| {
                                     let s = event_sender_clone3.clone();
@@ -164,23 +164,22 @@ async fn main() {
                             if let Some(ch) = peripheral.characteristics().iter().find(|c| c.uuid == btleplug::api::UUID::B16(characteristic_uuid)) {
                                 //peripheral.command(ch, &[b'b', b'a', b'h', b'o', b'j', b'\n']).expect("Command failed!");
                                 peripheral.command(ch, command.as_bytes()).expect("Command failed!");
+
+                                // TODO: send command/request to peripheral
+                                //let result = peripheral.request(last_char, &[b'1', b'\n']).expect("Request failed!");
+                                //let result = peripheral.request(last_char, &[b'b', b'a', b'h', b'o', b'j', b'\n']).expect("Request failed!");
+                                //println!("Result: {:?}", result);
+                                //peripheral.command(last_char, &[b'b', b'a', b'h', b'o', b'j', b'\n']).expect("Command failed!");
                             }
                         }
                     }
-
-                    // TODO: send command/request to peripheral
-                    //let result = peripheral.request(last_char, &[b'1', b'\n']).expect("Request failed!");
-                    //let result = peripheral.request(last_char, &[b'b', b'a', b'h', b'o', b'j', b'\n']).expect("Request failed!");
-                    //println!("Result: {:?}", result);
-                    //peripheral.command(last_char, &[b'b', b'a', b'h', b'o', b'j', b'\n']).expect("Command failed!");
                 }
             }
         }
-        //task::sleep(Duration::from_millis(200)).await;
     }
 }
 
-// TODO: https://github.com/deviceplug/btleplug
-// TODO: https://github.com/deviceplug/btleplug/blob/master/src/api/mod.rs
-// TODO: https://book.async.rs/
-// TODO: https://docs.rs/async-std/1.6.1/async_std/
+// https://github.com/deviceplug/btleplug
+// https://github.com/deviceplug/btleplug/blob/master/src/api/mod.rs
+// https://book.async.rs/
+// https://docs.rs/async-std/1.6.1/async_std/
