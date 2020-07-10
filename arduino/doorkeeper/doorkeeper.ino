@@ -10,6 +10,8 @@
 #define TX_PIN 10
 
 #define BUZZER_DURATION 2000
+#define LOOP_DELAY_TIME 10
+#define BUTTON_HOLD_TIME 1500
 
 // připojení knihovny SoftwareSerial
 #include <SoftwareSerial.h>
@@ -20,9 +22,12 @@ volatile bool button_state;
 volatile bool previous_button_state;
 
 unsigned long buzzer_start_time;
+unsigned long button_down_time;
 
-int noise_level, maximum;
-long casPreruseni;
+bool is_noise_up;
+long noise_interrupt_time;
+int max_noise_value;
+bool is_button_hold;
 
 void setup() {
   // inicializace komunikace po sériové lince
@@ -40,34 +45,49 @@ void setup() {
   // nastaveni RELAY
   pinMode(BUZZER_PIN, OUTPUT);
   digitalWrite(BUZZER_PIN, HIGH); // LOW == relay is connected, HIGH == relay is disconnected
-  buzzer_start_time = 0;
-  
+
   // nastaveni BELL a BUTTON
   pinMode(NOISE_THRESHOLD_PIN, INPUT);
   pinMode(BUTTON_PIN, INPUT_PULLUP);
 
-  attachInterrupt(digitalPinToInterrupt(NOISE_THRESHOLD_PIN), noise_interrupt, RISING);
+  attachInterrupt(digitalPinToInterrupt(NOISE_THRESHOLD_PIN), noise_interrupt, CHANGE);
   attachInterrupt(digitalPinToInterrupt(BUTTON_PIN), button_interrupt, CHANGE);
 
   button_state = previous_button_state = !digitalRead(BUTTON_PIN); // Pull-up resistors invert the logic, so true == off, false == on
 
-  on_button_changed();
+  buzzer_start_time = 0;
+  noise_interrupt_time = 0;
+  is_noise_up = false;
+  max_noise_value = 0;
+  button_down_time = 0;
+  is_button_hold = false;
 }
 
 void loop() {
 
-  // TODO: read NOISE_LEVEL_PIN
-  //int noise_level = analogRead(NOISE_LEVEL_PIN);
-  //Serial.println(noise_level);
- 
+  if (digitalRead(BUZZER_PIN) == LOW && ((millis() - buzzer_start_time) >= (unsigned long)BUZZER_DURATION)) { // overflow should not matter if calculating in unsigned integer arithmetics
+    digitalWrite(BUZZER_PIN, HIGH); // turn off buzzer
+
+    Serial.println("buzzer off");
+    bluetooth.println("buzzer-off");
+  }
+  
+  int noise_level = analogRead(NOISE_LEVEL_PIN);
+  if (is_noise_up) {
+    max_noise_value = max(max_noise_value, noise_level);
+  }
 
   if (button_state != previous_button_state) {
     on_button_changed();
     previous_button_state = button_state;
   }
 
-  if (digitalRead(BUZZER_PIN) == LOW && ((millis() - buzzer_start_time) >= (unsigned long)BUZZER_DURATION)) { // overflow should not matter if calculating in unsigned integer arithmetics
-    digitalWrite(BUZZER_PIN, HIGH); // turn off buzzer
+  if (button_state && !is_button_hold) {
+    unsigned long button_down_duration = millis() - button_down_time;
+    if (button_down_duration >= BUTTON_HOLD_TIME) {
+      is_button_hold = true;
+      bluetooth.println("button-hold");
+    }
   }
 
   byte BluetoothData;
@@ -91,34 +111,18 @@ void loop() {
         digitalWrite(LED_PIN, HIGH);
         bluetooth.println("LED on");
         break;
-      case 'a':
+      case 't':
         // v případě přejetí znaku 'a' vypíšeme
         // čas od spuštění Arduina
         bluetooth.print("Uptime: ");
         bluetooth.print(millis());
         bluetooth.println(" ms");
         break;
-      case 'b':
-        // zde je ukázka načtení většího počtu informací,
-        // po přijetí znaku 'b' tedy postupně tiskneme 
-        // další znaky poslané ve zprávě
-        bluetooth.print("Nacitam zpravu: ");
-        BluetoothData=bluetooth.read();
-        // v této smyčce zůstáváme do té doby,
-        // dokud jsou nějaké znaky ve frontě
-        while (bluetooth.available() > 0) {
-          bluetooth.write(BluetoothData);
-          Serial.write(BluetoothData);
-          // krátká pauza mezi načítáním znaků
-          delay(10);
-          BluetoothData=bluetooth.read();
-        }
-        bluetooth.println();
-        break;
       case 'x':
-        //digitalWrite(BUZZER_PIN, digitalRead(BUZZER_PIN) ? LOW : HIGH); // toggle buzzer pin
         buzzer_start_time = millis(); // remember buzzer start time
         digitalWrite(BUZZER_PIN, LOW); // turn on buzzer
+        Serial.println("buzzer on");
+        bluetooth.println("buzzer-on");
         break;
       case '\r':
         // přesun na začátek řádku - znak CR
@@ -133,25 +137,45 @@ void loop() {
     }
   }
 
-  delay(50);
+  delay(LOOP_DELAY_TIME);
 }
 
 void noise_interrupt() {
-  Serial.println("noise!");
-  bluetooth.println("noise!");
+  if (digitalRead(NOISE_THRESHOLD_PIN)) { // noise start
+    is_noise_up = true;
+    noise_interrupt_time = millis();
+    max_noise_value = analogRead(NOISE_LEVEL_PIN);
+    Serial.println("noise up");
+  }
+  else { // noise stop
+    if (is_noise_up) { // if it is too fast, do not react
+      is_noise_up = false;
+      long noise_interval = millis() - noise_interrupt_time;
+    
+      bluetooth.print("noise,");
+      bluetooth.print(noise_interval);
+      bluetooth.print(",");
+      bluetooth.println(max_noise_value);
+    }
+    Serial.println("noise down");
+  }
 }
 
 void button_interrupt() {
   button_state = !digitalRead(BUTTON_PIN);
+  if (button_state) {
+    button_down_time = millis();
+  }
 }
 
 void on_button_changed() {
   if (button_state) {
-    Serial.println("button on");
-    bluetooth.println("button on");
+    Serial.println("button down");
+    bluetooth.println("button-down");
   }
   else {
-    Serial.println("button off");
-    bluetooth.println("button off");
+    is_button_hold = false;
+    Serial.println("button up");
+    bluetooth.println("button-up");
   }
 }
