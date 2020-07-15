@@ -1,8 +1,4 @@
-use async_std::{
-    io,
-    sync::{channel},
-    task,
-};
+use async_std::{io, sync::channel, task};
 use btleplug::api::{Central, CentralEvent, Peripheral};
 #[cfg(target_os = "linux")]
 use btleplug::bluez::{adapter::ConnectedAdapter, manager::Manager};
@@ -10,9 +6,9 @@ use btleplug::bluez::{adapter::ConnectedAdapter, manager::Manager};
 use btleplug::corebluetooth::{adapter::Adapter, manager::Manager};
 #[cfg(target_os = "windows")]
 use btleplug::winrtble::{adapter::Adapter, manager::Manager};
+use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
-use std::str::FromStr;
 
 // adapter retrieval works differently depending on your platform right now.
 // API needs to be aligned.
@@ -38,7 +34,9 @@ fn get_central(manager: &Manager) -> ConnectedAdapter {
     adapter = manager.down(&adapter).unwrap();
     adapter = manager.up(&adapter).unwrap();
 
-    adapter.connect().expect("Error connecting to BLE Adapter....")
+    adapter
+        .connect()
+        .expect("Error connecting to BLE Adapter....")
 }
 
 #[derive(Debug, Clone)]
@@ -52,7 +50,6 @@ enum Notification {
 
 #[async_std::main]
 async fn main() {
-
     let peripheral_address = btleplug::api::BDAddr::from_str("00:13:AA:00:BA:0E").unwrap();
     let characteristic_uuid: u16 = 0xFFE1;
 
@@ -63,12 +60,13 @@ async fn main() {
     let central = get_central(&manager);
 
     // start scanning for devices
-    central.start_scan().expect("Can't scan BLE adapter for connected devices...");
+    central
+        .start_scan()
+        .expect("Can't scan BLE adapter for connected devices...");
     // instead of waiting, you can use central.on_event to be notified of
     // new devices
 
     let (event_sender, event_receiver) = channel(256);
-    
     let event_sender_clone = event_sender.clone();
     let event_sender_clone2 = event_sender.clone();
 
@@ -99,7 +97,6 @@ async fn main() {
         }
         _ => {}
     };
-    
     thread::spawn(move || {
         loop {
             let s = event_sender_clone.clone(); // must clone each iteration of the loop
@@ -115,18 +112,16 @@ async fn main() {
     });
 
     central.on_event(Box::new(on_event));
-  
     loop {
         let result = event_receiver.recv().await;
         //println!("Received: {:?}", result);
         if let Ok(notification) = result {
-        match notification {
+            match notification {
                 Notification::DeviceDiscovered(device_address) => {
                     if device_address == peripheral_address {
                         if let Some(device) = central.peripheral(device_address) {
                             device.connect().expect("Can't connect to peripheral...");
-                        }
-                        else {
+                        } else {
                             panic!("Device not discovered.");
                         }
                     }
@@ -134,22 +129,30 @@ async fn main() {
                 Notification::DeviceConnected(device_address) => {
                     if let Some(peripheral) = central.peripheral(device_address) {
                         if peripheral.is_connected() {
-                            let characteristics = peripheral.discover_characteristics().expect(&format!("Error while discovering characteristics of device '{}'", device_address));
-                            if let Some(ch) = characteristics.iter().find(|c| c.uuid == btleplug::api::UUID::B16(characteristic_uuid)) {
+                            let characteristics =
+                                peripheral.discover_characteristics().expect(&format!(
+                                    "Error while discovering characteristics of device '{}'",
+                                    device_address
+                                ));
+                            if let Some(ch) = characteristics
+                                .iter()
+                                .find(|c| c.uuid == btleplug::api::UUID::B16(characteristic_uuid))
+                            {
+                                peripheral
+                                    .subscribe(ch)
+                                    .expect("Subscription to characteristic failed");
 
-                                peripheral.subscribe(ch).expect("Subscription to characteristic failed");
-                                
                                 let event_sender_clone3 = event_sender_clone2.clone(); // TODO: learn Rust and avoid this ugly clones
-                                
                                 peripheral.on_notification(Box::new(move |vn| {
                                     let s = event_sender_clone3.clone();
-                                    let text = String::from_utf8(vn.value).expect("Notification message contains invalid UTF8 characters.");
+                                    let text = String::from_utf8(vn.value).expect(
+                                        "Notification message contains invalid UTF8 characters.",
+                                    );
                                     task::spawn(async move {
                                         s.send(Notification::DeviceNotification(text)).await;
                                     });
                                 }));
-                            }
-                            else {
+                            } else {
                                 eprintln!("Characteristic not found!");
                             }
                         }
@@ -160,8 +163,7 @@ async fn main() {
                     if device_address == peripheral_address {
                         if let Some(device) = central.peripheral(device_address) {
                             device.connect().expect("Can't connect to peripheral...");
-                        }
-                        else {
+                        } else {
                             panic!("Device not discovered.");
                         }
                     }
@@ -172,9 +174,15 @@ async fn main() {
                 Notification::InputCommand(command) => {
                     if let Some(peripheral) = central.peripheral(peripheral_address) {
                         if peripheral.is_connected() {
-                            if let Some(ch) = peripheral.characteristics().iter().find(|c| c.uuid == btleplug::api::UUID::B16(characteristic_uuid)) {
+                            if let Some(ch) = peripheral
+                                .characteristics()
+                                .iter()
+                                .find(|c| c.uuid == btleplug::api::UUID::B16(characteristic_uuid))
+                            {
                                 //peripheral.command(ch, &[b'b', b'a', b'h', b'o', b'j', b'\n']).expect("Command failed!");
-                                peripheral.command(ch, command.as_bytes()).expect("Command failed!");
+                                peripheral
+                                    .command(ch, command.as_bytes())
+                                    .expect("Command failed!");
 
                                 // TODO: send command/request to peripheral
                                 //let result = peripheral.request(last_char, &[b'1', b'\n']).expect("Request failed!");
