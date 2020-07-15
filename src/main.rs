@@ -126,6 +126,9 @@ async fn main() {
                         if let Some(device) = central.peripheral(device_address) {
                             device.connect().expect("Can't connect to peripheral...");
                         }
+                        else {
+                            panic!("Device not discovered.");
+                        }
                     }
                 }
                 Notification::DeviceConnected(device_address) => {
@@ -152,8 +155,16 @@ async fn main() {
                         }
                     }
                 }
-                Notification::DeviceDisconnected(_device_address) => {
-                    // TODO: try to reconnect
+                Notification::DeviceDisconnected(device_address) => {
+                    // try to reconnect
+                    if device_address == peripheral_address {
+                        if let Some(device) = central.peripheral(device_address) {
+                            device.connect().expect("Can't connect to peripheral...");
+                        }
+                        else {
+                            panic!("Device not discovered.");
+                        }
+                    }
                 }
                 Notification::DeviceNotification(notification_text) => {
                     println!("{}", notification_text.trim());
