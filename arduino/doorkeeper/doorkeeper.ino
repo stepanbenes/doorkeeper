@@ -85,8 +85,8 @@ void setup()
 
   // print default values
   bluetooth.println("hello");
-  bluetooth.println("volume-threshold:" + String(volume_threshold) + "%");
-  bluetooth.println("buzzer-duration:" + String(buzzer_duration) + "ms");
+  bluetooth.println("volume-threshold:" + String(volume_threshold));
+  bluetooth.println("buzzer-duration:" + String(buzzer_duration));
 }
 
 void loop()
