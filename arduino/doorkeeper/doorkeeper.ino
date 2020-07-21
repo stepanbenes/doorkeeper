@@ -84,9 +84,10 @@ void setup()
 
   // noise
   pinMode(NOISE_LEVEL_PIN, INPUT);
-
+  
   // buzzer pi
   pinMode(BUZZER_PIN, OUTPUT);
+  digitalWrite(BUZZER_PIN, HIGH); // turn off buzzer
 
   // print default values
   bluetooth.println("hello");
