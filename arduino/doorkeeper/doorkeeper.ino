@@ -129,7 +129,8 @@ void loop()
         double max_deviation = max(average_peak_frequency - min_peak_frequency, max_peak_frequency - average_peak_frequency);
         int average_peak_frequency_int = (int)round(average_peak_frequency);
         int max_deviation_int = (int)round(max_deviation);
-        bluetooth.println("noise:" + String(noise_duration) + ":" + String(max_sound_level));
+        int max_sound_level_int = (int)round(max_sound_level);
+        bluetooth.println("noise:" + String(noise_duration) + ":" + String(max_sound_level_int));
         bluetooth.println("freq:" + String(average_peak_frequency_int) + ":" + String(max_deviation_int));
       }
     }
