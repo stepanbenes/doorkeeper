@@ -303,6 +303,6 @@ void analyzeSound(double* peak_frequency, double* volume_max, double* volume_ave
 }
 
 void reportMessage(const String& message) {
-    bluetooth.print(message);
+    bluetooth.println(message);
     bluetooth.flush();
 }
