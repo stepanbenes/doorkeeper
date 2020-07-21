@@ -90,9 +90,9 @@ void setup()
   digitalWrite(BUZZER_PIN, HIGH); // turn off buzzer
 
   // print default values
-  bluetooth.println("hello");
-  bluetooth.println("volume-threshold:" + String(volume_threshold));
-  bluetooth.println("buzzer-duration:" + String(buzzer_duration));
+  reportMessage("hello");
+  reportMessage("volume-threshold:" + String(volume_threshold));
+  reportMessage("buzzer-duration:" + String(buzzer_duration));
 }
 
 void loop()
@@ -100,7 +100,7 @@ void loop()
   // handle buzzer
   if (digitalRead(BUZZER_PIN) == LOW && ((millis() - buzzer_start_time) >= buzzer_duration)) { // overflow should not matter if calculating in unsigned integer arithmetics
     digitalWrite(BUZZER_PIN, HIGH); // turn off buzzer
-    bluetooth.println("buzzer-off");
+    reportMessage("buzzer-off");
   }
 
   // analyze sound
@@ -136,8 +136,8 @@ void loop()
         int average_peak_frequency_int = (int)round(average_peak_frequency);
         int max_deviation_int = (int)round(max_deviation);
         int max_sound_level_int = (int)round(max_sound_level);
-        bluetooth.println("noise:" + String(noise_duration) + ":" + String(max_sound_level_int));
-        bluetooth.println("freq:" + String(average_peak_frequency_int) + ":" + String(max_deviation_int));
+        reportMessage("noise:" + String(noise_duration) + ":" + String(max_sound_level_int));
+        reportMessage("freq:" + String(average_peak_frequency_int) + ":" + String(max_deviation_int));
       }
     }
   }
@@ -151,15 +151,15 @@ void loop()
         is_button_down = current_is_button_down;
         is_button_hold = false;
         if (is_button_down) {
-          bluetooth.println("button-down");
+          reportMessage("button-down");
         }
         else {
-          bluetooth.println("button-up");
+          reportMessage("button-up");
         }
       }
       else if (is_button_down && !is_button_hold && (time_from_last_change >= (unsigned long)BUTTON_HOLD_TIME)) {
         is_button_hold = true;
-        bluetooth.println("button-hold");
+        reportMessage("button-hold");
       }
     }
   }
@@ -170,14 +170,14 @@ void loop()
     switch (bluetoothData) {
       case '0':
         digitalWrite(LED_PIN, LOW);
-        bluetooth.println("led-off");
+        reportMessage("led-off");
         break;
       case '1':
         digitalWrite(LED_PIN, HIGH);
-        bluetooth.println("led-on");
+        reportMessage("led-on");
         break;
       case 't':
-        bluetooth.print("uptime:" + String(millis()));
+        reportMessage("uptime:" + String(millis()));
         break;
       case 'v':
         {
@@ -186,7 +186,7 @@ void loop()
             volume_threshold = (int)value;
             is_noise_detected = false; // reset noise detection
           }
-          bluetooth.println("volume-threshold:" + String(volume_threshold));
+          reportMessage("volume-threshold:" + String(volume_threshold));
         }
         break;
       case 'b':
@@ -195,18 +195,18 @@ void loop()
           if (value > 0) {
             buzzer_duration = min((unsigned long)(value), (unsigned long)BUZZER_MAX_DURATION);
           }
-          bluetooth.println("buzzer-duration:" + String(buzzer_duration));
+          reportMessage("buzzer-duration:" + String(buzzer_duration));
         }
         break;
       case 'x':
         {
           buzzer_start_time = millis(); // remember buzzer start time
           digitalWrite(BUZZER_PIN, LOW); // turn on buzzer
-          bluetooth.println("buzzer-on");
+          reportMessage("buzzer-on");
         }
         break;
       case 'r':
-        bluetooth.println("rebooting...");
+        reportMessage("rebooting...");
         reboot();
         break;
       case '\r':
@@ -215,7 +215,7 @@ void loop()
         break;
       default:
         // report invalid command
-        bluetooth.print("invalid-command:" + String(bluetoothData) + "," + String((char)bluetoothData));
+        reportMessage("invalid-command:" + String(bluetoothData) + "," + String((char)bluetoothData));
         break;
     }
   }
@@ -300,4 +300,9 @@ void analyzeSound(double* peak_frequency, double* volume_max, double* volume_ave
     /*Find most dominant frequency*/
     double peak = FFT.MajorPeak(vReal, SAMPLES, SAMPLING_FREQUENCY);
     *peak_frequency = peak;
+}
+
+void reportMessage(const String& message) {
+    bluetooth.print(message);
+    bluetooth.flush();
 }
