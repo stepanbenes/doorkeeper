@@ -170,31 +170,25 @@ void loop()
         bluetooth.println("led-on");
         break;
       case 't':
-        bluetooth.print("uptime:" + String(millis()) + "ms");
+        bluetooth.print("uptime:" + String(millis()));
         break;
       case 'v':
         {
           long value = bluetooth.parseInt();
           if (value > 0) {
-            bluetooth.println("Set volume threshold to " + String(value) + "%");
             volume_threshold = (int)value;
             is_noise_detected = false; // reset noise detection
           }
-          else {
-            bluetooth.println("volume-threshold:" + String(volume_threshold));
-          }
+          bluetooth.println("volume-threshold:" + String(volume_threshold));
         }
         break;
       case 'b':
         {
           long value = bluetooth.parseInt();
           if (value) {
-            bluetooth.println("Set buzzer duration to " + String(value));
             buzzer_duration = min((int)value, (int)BUZZER_MAX_DURATION);
           }
-          else {
-            bluetooth.println("buzzer-duration:" + String(buzzer_duration));
-          }
+          bluetooth.println("buzzer-duration:" + String(buzzer_duration));
         }
         break;
       case 'x':
