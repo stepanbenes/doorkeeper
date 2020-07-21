@@ -186,8 +186,8 @@ void loop()
       case 'b':
         {
           long value = bluetooth.parseInt();
-          if (value) {
-            buzzer_duration = min((int)value, (int)BUZZER_MAX_DURATION);
+          if (value > 0) {
+            buzzer_duration = min((unsigned long)(value), (unsigned long)BUZZER_MAX_DURATION);
           }
           bluetooth.println("buzzer-duration:" + String(buzzer_duration));
         }
