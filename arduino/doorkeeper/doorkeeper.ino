@@ -8,7 +8,7 @@
 
 #define LOOP_DELAY_TIME 10
 
-#define BUTTON_DEBOUNCE_TIME 100
+#define BUTTON_DEBOUNCE_TIME 50
 #define BUTTON_HOLD_TIME 1500
 
 #define SAMPLES 128             //SAMPLES-pt FFT. Must be a base 2 number. Max 128 for Arduino Uno.
