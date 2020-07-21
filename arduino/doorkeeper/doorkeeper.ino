@@ -56,6 +56,7 @@ double max_sound_level;
 
 void setup()
 {
+  // set default values
   last_button_interrupt_time = 0;
   last_noise_detected_time = 0;
   is_noise_detected = false;
@@ -67,6 +68,7 @@ void setup()
   volume_threshold = DEFAULT_VOLUME_THRESHOLD;
   samplingPeriod = round(1000000*(1.0/SAMPLING_FREQUENCY)); //Period in microseconds
   
+  // setup communication
   Serial.begin(9600);
   bluetooth.begin(9600);
 
@@ -82,6 +84,9 @@ void setup()
 
   // noise
   pinMode(NOISE_LEVEL_PIN, INPUT);
+
+  // buzzer pi
+  pinMode(BUZZER_PIN, OUTPUT);
 
   // print default values
   bluetooth.println("hello");
