@@ -10,6 +10,11 @@ use std::str::FromStr;
 use std::thread;
 use std::time::Duration;
 
+use std::fs::OpenOptions;
+use std::io::prelude::*;
+
+use chrono::{ Local };
+
 // adapter retrieval works differently depending on your platform right now.
 // API needs to be aligned.
 
@@ -46,6 +51,11 @@ enum Notification {
     DeviceDisconnected(btleplug::api::BDAddr),
     DeviceNotification(String),
     InputCommand(String),
+}
+
+enum LogMessage {
+    CommandInput(String),
+    DeviceOutput(String),
 }
 
 #[async_std::main]
@@ -99,6 +109,8 @@ async fn main() {
         }
         _ => {}
     };
+
+    // stdin checking
     thread::spawn(move || {
         loop {
             let s = event_sender_clone.clone(); // must clone each iteration of the loop
@@ -113,6 +125,7 @@ async fn main() {
         }
     });
 
+    // bluetooth event handling
     central.on_event(Box::new(on_event));
     loop {
         let result = event_receiver.recv().await;
@@ -174,6 +187,7 @@ async fn main() {
                     process_device_notification(&notification_text, &mut notification_buffer);
                 }
                 Notification::InputCommand(command) => {
+                    log_message(LogMessage::CommandInput(command.to_owned()));
                     if let Some(peripheral) = central.peripheral(peripheral_address) {
                         if peripheral.is_connected() {
                             if let Some(ch) = peripheral
@@ -211,6 +225,9 @@ fn process_device_notification(notification: &str, notification_buffer: &mut Str
             '\r' => {
                 // ignore
             }
+            '\0' => {
+                // ignore zero byte (received during initialization of arduino)
+            }
             _ => {
                 notification_buffer.push(ch);
             }
@@ -223,7 +240,7 @@ fn process_message(message: &str) {
         return;
     }
     
-    log_message(message);
+    log_message(LogMessage::DeviceOutput(String::from(message)));
 
     let tokens: Vec<&str> = message.split(':').collect();
     if tokens.len() == 0 {
@@ -233,59 +250,87 @@ fn process_message(message: &str) {
     match tokens[0] {
         "hello" => {
             assert_eq!(tokens.len(), 1);
+            report_message(message);
         }
         "bye" => {
             assert_eq!(tokens.len(), 1);
+            report_message(message);
         }
         "uptime" => {
             // u32 (millis)
             assert_eq!(tokens.len(), 2);
+            report_message(message);
         }
         "led" => {
             // "on" | "off"
             assert_eq!(tokens.len(), 2);
+            report_message(message);
         }
         "button" => {
             // "down" | "up" | "press" | "hold"
             assert_eq!(tokens.len(), 2);
+            match tokens[1] {
+                "press" | "hold" => {
+                    report_message(message);
+                }
+                "down" | "up" => {
+                    // ignore
+                }
+                _ => {
+                    panic!(format!("unexpected button modified: {}", tokens[1]));
+                }
+            }
         }
         "buzzer" => {
             // "on" | "off"
             assert_eq!(tokens.len(), 2);
+            report_message(message);
         }
         "buzzer-duration" => {
             // u16 (millis)
             assert_eq!(tokens.len(), 2);
-            
+            report_message(message);
         }
         "volume-threshold" => {
             // u16 (max=5000, %)
             assert_eq!(tokens.len(), 2);
+            report_message(message);
         }
         "noise" => {
             // noise_duration : max_sound_level_int : average_peak_frequency_int : min_peak_frequency_int : max_peak_frequency_int
             // u32 : i32 (max=100, %) : i16 : i16 : i16
             assert_eq!(tokens.len(), 6);
+            report_message(message);
         }
         "invalid-command" => {
             // byte : char
             assert_eq!(tokens.len(), 3);
+            panic!(format!("{}", message));
         }
         _ => {
             // unknown message
+            panic!(format!("unknown message: {}", message));
         }
     }
-    
-    report_message(message); // don't report all messages
 }
 
 fn report_message(message: &str) {
     // print to standard output
-    println!(">{}", message);
+    println!("{}", message); // do not use print!, it does not flush the stream
 }
 
-fn log_message(message: &str) {
-    // TODO: append to file named by current date
+fn log_message(message: LogMessage) {
+    let now = Local::now();
+    let file_name = format!("/var/log/doorkeeper/{}.log", now.format("%Y-%m-%d"));
+    let mut file = OpenOptions::new().append(true).create(true).open(&file_name).expect(format!("Cannot open file '{}'.", file_name).as_str());
+    match message {
+        LogMessage::CommandInput(text) => {
+            writeln!(file, "[{}] > {}", now.format("%H:%M:%S"), text.trim()).expect(format!("Could not write to file '{}'.", file_name).as_str());
+        }
+        LogMessage::DeviceOutput(text) => {
+            writeln!(file, "[{}] < {}", now.format("%H:%M:%S"), text.trim()).expect(format!("Could not write to file '{}'.", file_name).as_str());
+        }
+    }
 }
 
 // https://github.com/deviceplug/btleplug

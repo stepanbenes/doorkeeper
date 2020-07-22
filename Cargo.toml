@@ -10,3 +10,4 @@ edition = "2018"
 btleplug = { version = "0.4", features = ["serde"] }
 async-std = { version = "1.6.1", features = ["attributes"] }
 rand = "0.7.3"
+chrono = "0.4.11"
