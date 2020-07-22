@@ -100,7 +100,7 @@ void loop()
   // handle buzzer
   if (digitalRead(BUZZER_PIN) == LOW && ((millis() - buzzer_start_time) >= buzzer_duration)) { // overflow should not matter if calculating in unsigned integer arithmetics
     digitalWrite(BUZZER_PIN, HIGH); // turn off buzzer
-    reportMessage("buzzer-off");
+    reportMessage("buzzer:off");
   }
 
   // analyze sound
@@ -132,12 +132,13 @@ void loop()
         is_noise_detected = false;
         unsigned long noise_duration = millis() - last_noise_detected_time;
         double average_peak_frequency = frequency_accumulator / frequency_counter;
-        double max_deviation = max(average_peak_frequency - min_peak_frequency, max_peak_frequency - average_peak_frequency);
-        int average_peak_frequency_int = (int)round(average_peak_frequency);
-        int max_deviation_int = (int)round(max_deviation);
+        //double max_deviation = max(average_peak_frequency - min_peak_frequency, max_peak_frequency - average_peak_frequency);
         int max_sound_level_int = (int)round(max_sound_level);
-        reportMessage("noise:" + String(noise_duration) + ":" + String(max_sound_level_int));
-        reportMessage("freq:" + String(average_peak_frequency_int) + ":" + String(max_deviation_int));
+        int average_peak_frequency_int = (int)round(average_peak_frequency);
+        int min_peak_frequency_int = (int)round(min_peak_frequency);
+        int max_peak_frequency_int = (int)round(max_peak_frequency);
+        
+        reportMessage("noise:" + String(noise_duration) + ":" + String(max_sound_level_int) + ":" + String(average_peak_frequency_int) + ":" + String(min_peak_frequency_int) + ":" + String(max_peak_frequency_int));
       }
     }
   }
@@ -149,17 +150,20 @@ void loop()
       bool current_is_button_down = !digitalRead(BUTTON_PIN);
       if (current_is_button_down != is_button_down) {
         is_button_down = current_is_button_down;
-        is_button_hold = false;
         if (is_button_down) {
-          reportMessage("button-down");
+          reportMessage("button:down");
         }
         else {
-          reportMessage("button-up");
+          reportMessage("button:up");
+          if (!is_button_hold) {
+            reportMessage("button:press"); // if it is a short press, report it separately
+          }
         }
+        is_button_hold = false;
       }
       else if (is_button_down && !is_button_hold && (time_from_last_change >= (unsigned long)BUTTON_HOLD_TIME)) {
         is_button_hold = true;
-        reportMessage("button-hold");
+        reportMessage("button:hold");
       }
     }
   }
@@ -170,18 +174,18 @@ void loop()
     switch (bluetoothData) {
       case '0':
         digitalWrite(LED_PIN, LOW);
-        reportMessage("led-off");
+        reportMessage("led:off");
         break;
       case '1':
         digitalWrite(LED_PIN, HIGH);
-        reportMessage("led-on");
+        reportMessage("led:on");
         break;
       case 't':
         reportMessage("uptime:" + String(millis()));
         break;
       case 'v':
         {
-          long value = bluetooth.parseInt();
+          long value = bluetooth.parseInt(); // WARNING: max possible value is "65535", if exceeded it overflows
           if (value > 0) {
             volume_threshold = (int)value;
             is_noise_detected = false; // reset noise detection
@@ -191,7 +195,7 @@ void loop()
         break;
       case 'b':
         {
-          long value = bluetooth.parseInt();
+          long value = bluetooth.parseInt(); // WARNING: max possible value is "65535", if exceeded it overflows
           if (value > 0) {
             buzzer_duration = min((unsigned long)(value), (unsigned long)BUZZER_MAX_DURATION);
           }
@@ -202,11 +206,11 @@ void loop()
         {
           buzzer_start_time = millis(); // remember buzzer start time
           digitalWrite(BUZZER_PIN, LOW); // turn on buzzer
-          reportMessage("buzzer-on");
+          reportMessage("buzzer:on");
         }
         break;
       case 'r':
-        reportMessage("rebooting...");
+        reportMessage("bye");
         reboot();
         break;
       case '\r':
@@ -215,7 +219,7 @@ void loop()
         break;
       default:
         // report invalid command
-        reportMessage("invalid-command:" + String(bluetoothData) + "," + String((char)bluetoothData));
+        reportMessage("invalid-command:" + String(bluetoothData) + ":" + String((char)bluetoothData));
         break;
     }
   }

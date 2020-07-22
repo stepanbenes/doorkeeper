@@ -70,6 +70,8 @@ async fn main() {
     let event_sender_clone = event_sender.clone();
     let event_sender_clone2 = event_sender.clone();
 
+    let mut notification_buffer = String::new();
+
     // Add ourselves to the central event handler output now, so we don't
     // have to carry around the Central object. We'll be using this in
     // connect anyways.
@@ -169,7 +171,7 @@ async fn main() {
                     }
                 }
                 Notification::DeviceNotification(notification_text) => {
-                    println!("{}", notification_text.trim());
+                    process_device_notification(&notification_text, &mut notification_buffer);
                 }
                 Notification::InputCommand(command) => {
                     if let Some(peripheral) = central.peripheral(peripheral_address) {
@@ -196,6 +198,94 @@ async fn main() {
             }
         }
     }
+}
+
+fn process_device_notification(notification: &str, notification_buffer: &mut String) {
+    // TODO: buffer messages, look for new line character, do not print before new line is received
+    for ch in notification.chars() {
+        match ch {
+            '\n' => { 
+                process_message(&notification_buffer);
+                notification_buffer.clear();
+            }
+            '\r' => {
+                // ignore
+            }
+            _ => {
+                notification_buffer.push(ch);
+            }
+        };
+    }
+}
+
+fn process_message(message: &str) {
+    if message.len() == 0 {
+        return;
+    }
+    
+    log_message(message);
+
+    let tokens: Vec<&str> = message.split(':').collect();
+    if tokens.len() == 0 {
+        return;
+    }
+
+    match tokens[0] {
+        "hello" => {
+            assert_eq!(tokens.len(), 1);
+        }
+        "bye" => {
+            assert_eq!(tokens.len(), 1);
+        }
+        "uptime" => {
+            // u32 (millis)
+            assert_eq!(tokens.len(), 2);
+        }
+        "led" => {
+            // "on" | "off"
+            assert_eq!(tokens.len(), 2);
+        }
+        "button" => {
+            // "down" | "up" | "press" | "hold"
+            assert_eq!(tokens.len(), 2);
+        }
+        "buzzer" => {
+            // "on" | "off"
+            assert_eq!(tokens.len(), 2);
+        }
+        "buzzer-duration" => {
+            // u16 (millis)
+            assert_eq!(tokens.len(), 2);
+            
+        }
+        "volume-threshold" => {
+            // u16 (max=5000, %)
+            assert_eq!(tokens.len(), 2);
+        }
+        "noise" => {
+            // noise_duration : max_sound_level_int : average_peak_frequency_int : min_peak_frequency_int : max_peak_frequency_int
+            // u32 : i32 (max=100, %) : i16 : i16 : i16
+            assert_eq!(tokens.len(), 6);
+        }
+        "invalid-command" => {
+            // byte : char
+            assert_eq!(tokens.len(), 3);
+        }
+        _ => {
+            // unknown message
+        }
+    }
+    
+    report_message(message); // don't report all messages
+}
+
+fn report_message(message: &str) {
+    // print to standard output
+    println!(">{}", message);
+}
+
+fn log_message(message: &str) {
+    // TODO: append to file named by current date
 }
 
 // https://github.com/deviceplug/btleplug
