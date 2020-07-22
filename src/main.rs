@@ -187,24 +187,27 @@ async fn main() {
                     process_device_notification(&notification_text, &mut notification_buffer);
                 }
                 Notification::InputCommand(command) => {
-                    log_message(LogMessage::CommandInput(command.to_owned()));
-                    if let Some(peripheral) = central.peripheral(peripheral_address) {
-                        if peripheral.is_connected() {
-                            if let Some(ch) = peripheral
-                                .characteristics()
-                                .iter()
-                                .find(|c| c.uuid == btleplug::api::UUID::B16(characteristic_uuid))
-                            {
-                                //peripheral.command(ch, &[b'b', b'a', b'h', b'o', b'j', b'\n']).expect("Command failed!");
-                                peripheral
-                                    .command(ch, command.as_bytes())
-                                    .expect("Command failed!");
+                    if !command.is_empty() {
+                        log_message(LogMessage::CommandInput(command.to_owned()));
+                    
+                        if let Some(peripheral) = central.peripheral(peripheral_address) {
+                            if peripheral.is_connected() {
+                                if let Some(ch) = peripheral
+                                    .characteristics()
+                                    .iter()
+                                    .find(|c| c.uuid == btleplug::api::UUID::B16(characteristic_uuid))
+                                {
+                                    //peripheral.command(ch, &[b'b', b'a', b'h', b'o', b'j', b'\n']).expect("Command failed!");
+                                    peripheral
+                                        .command(ch, command.as_bytes())
+                                        .expect("Command failed!");
 
-                                // TODO: send command/request to peripheral
-                                //let result = peripheral.request(last_char, &[b'1', b'\n']).expect("Request failed!");
-                                //let result = peripheral.request(last_char, &[b'b', b'a', b'h', b'o', b'j', b'\n']).expect("Request failed!");
-                                //println!("Result: {:?}", result);
-                                //peripheral.command(last_char, &[b'b', b'a', b'h', b'o', b'j', b'\n']).expect("Command failed!");
+                                    // TODO: send command/request to peripheral
+                                    //let result = peripheral.request(last_char, &[b'1', b'\n']).expect("Request failed!");
+                                    //let result = peripheral.request(last_char, &[b'b', b'a', b'h', b'o', b'j', b'\n']).expect("Request failed!");
+                                    //println!("Result: {:?}", result);
+                                    //peripheral.command(last_char, &[b'b', b'a', b'h', b'o', b'j', b'\n']).expect("Command failed!");
+                                }
                             }
                         }
                     }
@@ -236,7 +239,7 @@ fn process_device_notification(notification: &str, notification_buffer: &mut Str
 }
 
 fn process_message(message: &str) {
-    if message.len() == 0 {
+    if message.is_empty() {
         return;
     }
     
