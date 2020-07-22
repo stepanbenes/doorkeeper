@@ -154,10 +154,10 @@ void loop()
           reportMessage("button:down");
         }
         else {
-          reportMessage("button:up");
           if (!is_button_hold) {
             reportMessage("button:press"); // if it is a short press, report it separately
           }
+          reportMessage("button:up");
         }
         is_button_hold = false;
       }
