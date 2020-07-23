@@ -300,10 +300,7 @@ fn process_message(message: &str) {
             report_message(message);
         }
         "noise" => {
-            // noise_duration : max_sound_level_int : average_peak_frequency_int : min_peak_frequency_int : max_peak_frequency_int
-            // u32 : i32 (max=100, %) : i16 : i16 : i16
-            assert_eq!(tokens.len(), 6);
-            report_message(message);
+            process_noise_message(&tokens);
         }
         "invalid-command" => {
             // byte : char
@@ -314,6 +311,23 @@ fn process_message(message: &str) {
             // unknown message
             panic!(format!("unknown message: {}", message));
         }
+    }
+}
+
+fn process_noise_message(tokens: &Vec<&str>) {
+    // noise_duration : max_sound_level : average_peak_frequency : min_peak_frequency : max_peak_frequency
+    // u32 : i32 (max=100, %) : i16 : i16 : i16
+    assert_eq!(tokens.len(), 6);
+    assert_eq!(tokens[0], "noise");
+    let noise_duration: u32 = tokens[1].parse().expect(format!("Could not parse noise_duration token as u32. '{}'", tokens[1]).as_str());
+    let max_sound_level: i32 = tokens[2].parse().expect(format!("Could not parse max_sound_level token as i32. '{}'", tokens[2]).as_str());
+    let average_peak_frequency: i16 = tokens[3].parse().expect(format!("Could not parse average_peak_frequency token as i16. '{}'", tokens[3]).as_str());
+    //let min_peak_frequency: i16 = tokens[4].parse().expect(format!("Could not parse min_peak_frequency token as i16. '{}'", tokens[4]).as_str());
+    //let max_peak_frequency: i16 = tokens[5].parse().expect(format!("Could not parse max_peak_frequency token as i16. '{}'", tokens[5]).as_str());
+    //let max_deviation = std::cmp::max(average_peak_frequency - min_peak_frequency, max_peak_frequency - average_peak_frequency);
+
+    if noise_duration > 300 && max_sound_level > 70 && average_peak_frequency > 500 && average_peak_frequency < 900 {
+        report_message(format!("Nekdo zvoni! ({} ms)", noise_duration).as_str());
     }
 }
 
