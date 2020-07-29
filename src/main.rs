@@ -326,7 +326,7 @@ fn process_noise_message(tokens: &Vec<&str>) {
     //let max_peak_frequency: i16 = tokens[5].parse().expect(format!("Could not parse max_peak_frequency token as i16. '{}'", tokens[5]).as_str());
     //let max_deviation = std::cmp::max(average_peak_frequency - min_peak_frequency, max_peak_frequency - average_peak_frequency);
 
-    if noise_duration > 300 && max_sound_level > 70 && average_peak_frequency > 500 && average_peak_frequency < 900 {
+    if noise_duration > 300 && max_sound_level > 50 && average_peak_frequency > 500 && average_peak_frequency < 900 {
         report_message(format!("Nekdo zvoni! ({} ms)", noise_duration).as_str());
     }
 }
