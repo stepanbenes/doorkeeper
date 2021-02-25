@@ -13,7 +13,7 @@ use std::time::Duration;
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 
-use chrono::{ Local };
+use chrono::Local;
 
 // adapter retrieval works differently depending on your platform right now.
 // API needs to be aligned.
@@ -189,14 +189,11 @@ async fn main() {
                 Notification::InputCommand(command) => {
                     if !command.is_empty() {
                         log_message(LogMessage::CommandInput(command.to_owned()));
-                    
                         if let Some(peripheral) = central.peripheral(peripheral_address) {
                             if peripheral.is_connected() {
-                                if let Some(ch) = peripheral
-                                    .characteristics()
-                                    .iter()
-                                    .find(|c| c.uuid == btleplug::api::UUID::B16(characteristic_uuid))
-                                {
+                                if let Some(ch) = peripheral.characteristics().iter().find(|c| {
+                                    c.uuid == btleplug::api::UUID::B16(characteristic_uuid)
+                                }) {
                                     //peripheral.command(ch, &[b'b', b'a', b'h', b'o', b'j', b'\n']).expect("Command failed!");
                                     peripheral
                                         .command(ch, command.as_bytes())
@@ -221,7 +218,7 @@ fn process_device_notification(notification: &str, notification_buffer: &mut Str
     // TODO: buffer messages, look for new line character, do not print before new line is received
     for ch in notification.chars() {
         match ch {
-            '\n' => { 
+            '\n' => {
                 process_message(&notification_buffer);
                 notification_buffer.clear();
             }
@@ -242,7 +239,6 @@ fn process_message(message: &str) {
     if message.is_empty() {
         return;
     }
-    
     log_message(LogMessage::DeviceOutput(String::from(message)));
 
     let tokens: Vec<&str> = message.split(':').collect();
@@ -319,14 +315,36 @@ fn process_noise_message(tokens: &Vec<&str>) {
     // u32 : i32 (max=100, %) : i16 : i16 : i16
     assert_eq!(tokens.len(), 6);
     assert_eq!(tokens[0], "noise");
-    let noise_duration: u32 = tokens[1].parse().expect(format!("Could not parse noise_duration token as u32. '{}'", tokens[1]).as_str());
-    let max_sound_level: i32 = tokens[2].parse().expect(format!("Could not parse max_sound_level token as i32. '{}'", tokens[2]).as_str());
-    let average_peak_frequency: i16 = tokens[3].parse().expect(format!("Could not parse average_peak_frequency token as i16. '{}'", tokens[3]).as_str());
+    let noise_duration: u32 = tokens[1].parse().expect(
+        format!(
+            "Could not parse noise_duration token as u32. '{}'",
+            tokens[1]
+        )
+        .as_str(),
+    );
+    let max_sound_level: i32 = tokens[2].parse().expect(
+        format!(
+            "Could not parse max_sound_level token as i32. '{}'",
+            tokens[2]
+        )
+        .as_str(),
+    );
+    let average_peak_frequency: i16 = tokens[3].parse().expect(
+        format!(
+            "Could not parse average_peak_frequency token as i16. '{}'",
+            tokens[3]
+        )
+        .as_str(),
+    );
     //let min_peak_frequency: i16 = tokens[4].parse().expect(format!("Could not parse min_peak_frequency token as i16. '{}'", tokens[4]).as_str());
     //let max_peak_frequency: i16 = tokens[5].parse().expect(format!("Could not parse max_peak_frequency token as i16. '{}'", tokens[5]).as_str());
     //let max_deviation = std::cmp::max(average_peak_frequency - min_peak_frequency, max_peak_frequency - average_peak_frequency);
 
-    if noise_duration > 300 && max_sound_level > 50 && average_peak_frequency > 500 && average_peak_frequency < 900 {
+    if noise_duration > 300
+        && max_sound_level > 50
+        && average_peak_frequency > 500
+        && average_peak_frequency < 900
+    {
         report_message(format!("Nekdo zvoni! ({} ms)", noise_duration).as_str());
     }
 }
@@ -339,13 +357,19 @@ fn report_message(message: &str) {
 fn log_message(message: LogMessage) {
     let now = Local::now();
     let file_name = format!("/var/log/doorkeeper/{}.log", now.format("%Y-%m-%d"));
-    let mut file = OpenOptions::new().append(true).create(true).open(&file_name).expect(format!("Cannot open file '{}'.", file_name).as_str());
+    let mut file = OpenOptions::new()
+        .append(true)
+        .create(true)
+        .open(&file_name)
+        .expect(format!("Cannot open file '{}'.", file_name).as_str());
     match message {
         LogMessage::CommandInput(text) => {
-            writeln!(file, "[{}] > {}", now.format("%H:%M:%S"), text.trim()).expect(format!("Could not write to file '{}'.", file_name).as_str());
+            writeln!(file, "[{}] > {}", now.format("%H:%M:%S"), text.trim())
+                .expect(format!("Could not write to file '{}'.", file_name).as_str());
         }
         LogMessage::DeviceOutput(text) => {
-            writeln!(file, "[{}] < {}", now.format("%H:%M:%S"), text.trim()).expect(format!("Could not write to file '{}'.", file_name).as_str());
+            writeln!(file, "[{}] < {}", now.format("%H:%M:%S"), text.trim())
+                .expect(format!("Could not write to file '{}'.", file_name).as_str());
         }
     }
 }
